@@ -585,7 +585,7 @@ impl MemoryEditor {
         window_title: Option<&str>,
         cb_data: &mut T,
         mut read: impl FnMut(&mut T, Addr) -> Option<u8>,
-        mut write: impl FnMut(&mut T, Addr, u8),
+        _write: impl FnMut(&mut T, Addr, u8),
     ) {
         self.compute_layout(ui);
 

@@ -5,5 +5,5 @@ edition = "2021"
 publish = false
 
 [dependencies]
-imgui = { git = "https://github.com/imgui-rs/imgui-rs" }
+imgui = "0.11"
 bitflags = "1.3"
