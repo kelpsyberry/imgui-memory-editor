@@ -1,6 +1,6 @@
 #![allow(clippy::suspicious_arithmetic_impl)]
 
-use core::ops::{Add, Div, Mul, Rem, Sub};
+use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign};
 
 pub type YPosRaw = u128;
 pub type SignedYPosRaw = i128;
@@ -11,32 +11,29 @@ macro_rules! impl_bin_ops {
     ($ty: ty, $raw: ty) => {
         impl_bin_ops!(
             $ty, $raw;
-            Add, add, wrapped;
-            Sub, sub, wrapped;
-            Mul, mul, wrapped, shifted_res;
-            Div, div, wrapped, shifted_lhs;
-            Rem, rem, wrapped;
-            Add, add, raw, shifted_rhs;
-            Sub, sub, raw, shifted_rhs;
-            Mul, mul, raw;
-            Div, div, raw;
-            Rem, rem, raw, shifted_rhs;
-            Add, add, float f32;
-            Sub, sub, float f32;
-            Mul, mul, float f32;
-            Div, div, float f32;
-            Rem, rem, float f32;
-            Add, add, float f64;
-            Sub, sub, float f64;
-            Mul, mul, float f64;
-            Div, div, float f64;
-            Rem, rem, float f64;
+            Add, add, AddAssign, add_assign, wrapped;
+            Sub, sub, SubAssign, sub_assign, wrapped;
+            Mul, mul, MulAssign, mul_assign, wrapped, shifted_res;
+            Div, div, DivAssign, div_assign, wrapped, shifted_lhs;
+            Rem, rem, RemAssign, rem_assign, wrapped;
+            Add, add, AddAssign, add_assign, raw, shifted_rhs;
+            Sub, sub, SubAssign, sub_assign, raw, shifted_rhs;
+            Mul, mul, MulAssign, mul_assign, raw;
+            Div, div, DivAssign, div_assign, raw;
+            Rem, rem, RemAssign, rem_assign, raw, shifted_rhs;
+            Add, add, AddAssign, add_assign, float f32, f64;
+            Sub, sub, SubAssign, sub_assign, float f32, f64;
+            Mul, mul, MulAssign, mul_assign, float f32, f64;
+            Div, div, DivAssign, div_assign, float f32, f64;
+            Rem, rem, RemAssign, rem_assign, float f32, f64;
         );
     };
 
     ($ty: ty, $raw: ty;) => {};
 
-    ($ty: ty, $raw: ty; $trait: ident, $fn: ident, wrapped; $($remaining: tt)*) => {
+    (
+        $ty: ty, $raw: ty;
+        $trait: ident, $fn: ident, $trait_assign: ident, $fn_assign: ident, wrapped; $($remaining: tt)*) => {
         impl $trait for $ty {
             type Output = Self;
             #[inline]
@@ -44,10 +41,20 @@ macro_rules! impl_bin_ops {
                 Self(self.0.$fn(rhs.0))
             }
         }
+        impl $trait_assign for $ty {
+            #[inline]
+            fn $fn_assign(&mut self, rhs: Self) {
+                self.0.$fn_assign(rhs.0);
+            }
+        }
         impl_bin_ops!($ty, $raw; $($remaining)*);
     };
 
-    ($ty: ty, $raw: ty; $trait: ident, $fn: ident, wrapped, shifted_lhs; $($remaining: tt)*) => {
+    (
+        $ty: ty, $raw: ty;
+        $trait: ident, $fn: ident, $trait_assign: ident, $fn_assign: ident, wrapped, shifted_lhs;
+        $($remaining: tt)*
+    ) => {
         impl $trait for $ty {
             type Output = Self;
             #[inline]
@@ -55,10 +62,21 @@ macro_rules! impl_bin_ops {
                 Self((self.0 << FRACT_BITS).$fn(rhs.0))
             }
         }
+        impl $trait_assign for $ty {
+            #[inline]
+            #[allow(clippy::suspicious_op_assign_impl)]
+            fn $fn_assign(&mut self, rhs: Self) {
+                self.0 = (self.0 << FRACT_BITS).$fn(rhs.0);
+            }
+        }
         impl_bin_ops!($ty, $raw; $($remaining)*);
     };
 
-    ($ty: ty, $raw: ty; $trait: ident, $fn: ident, wrapped, shifted_res; $($remaining: tt)*) => {
+    (
+        $ty: ty, $raw: ty;
+        $trait: ident, $fn: ident, $trait_assign: ident, $fn_assign: ident, wrapped, shifted_res;
+        $($remaining: tt)*
+    ) => {
         impl $trait for $ty {
             type Output = Self;
             #[inline]
@@ -66,10 +84,21 @@ macro_rules! impl_bin_ops {
                 Self(self.0.$fn(rhs.0) >> FRACT_BITS)
             }
         }
+        impl $trait_assign for $ty {
+            #[inline]
+            #[allow(clippy::suspicious_op_assign_impl)]
+            fn $fn_assign(&mut self, rhs: Self) {
+                self.0 = self.0.$fn(rhs.0) >> FRACT_BITS;
+            }
+        }
         impl_bin_ops!($ty, $raw; $($remaining)*);
     };
 
-    ($ty: ty, $raw: ty; $trait: ident, $fn: ident, raw; $($remaining: tt)*) => {
+    (
+        $ty: ty, $raw: ty;
+        $trait: ident, $fn: ident, $trait_assign: ident, $fn_assign: ident, raw;
+        $($remaining: tt)*
+    ) => {
         impl $trait<$raw> for $ty {
             type Output = Self;
             #[inline]
@@ -77,10 +106,20 @@ macro_rules! impl_bin_ops {
                 Self(self.0.$fn(rhs))
             }
         }
+        impl $trait_assign<$raw> for $ty {
+            #[inline]
+            fn $fn_assign(&mut self, rhs: $raw) {
+                self.0.$fn_assign(rhs);
+            }
+        }
         impl_bin_ops!($ty, $raw; $($remaining)*);
     };
 
-    ($ty: ty, $raw: ty; $trait: ident, $fn: ident, raw, shifted_rhs; $($remaining: tt)*) => {
+    (
+        $ty: ty, $raw: ty;
+        $trait: ident, $fn: ident, $trait_assign: ident, $fn_assign: ident, raw, shifted_rhs;
+        $($remaining: tt)*
+    ) => {
         impl $trait<$raw> for $ty {
             type Output = Self;
             #[inline]
@@ -88,17 +127,31 @@ macro_rules! impl_bin_ops {
                 Self(self.0.$fn(rhs << FRACT_BITS))
             }
         }
+        impl $trait_assign<$raw> for $ty {
+            #[inline]
+            #[allow(clippy::suspicious_op_assign_impl)]
+            fn $fn_assign(&mut self, rhs: $raw) {
+                self.0.$fn_assign(rhs << FRACT_BITS);
+            }
+        }
         impl_bin_ops!($ty, $raw; $($remaining)*);
     };
 
-    ($ty: ty, $raw: ty; $trait: ident, $fn: ident, float $float_ty: ty; $($remaining: tt)*) => {
-        impl $trait<$float_ty> for $ty {
-            type Output = Self;
-            #[inline]
-            fn $fn(self, rhs: $float_ty) -> Self::Output {
-                self.$fn(Self::from(rhs))
+    (
+        $ty: ty, $raw: ty;
+        $trait: ident, $fn: ident, $trait_assign: ident, $fn_assign: ident,
+        float $($float_ty: ty),*;
+        $($remaining: tt)*
+    ) => {
+        $(
+            impl $trait<$float_ty> for $ty {
+                type Output = Self;
+                #[inline]
+                fn $fn(self, rhs: $float_ty) -> Self::Output {
+                    self.$fn(Self::from(rhs))
+                }
             }
-        }
+        )*
         impl_bin_ops!($ty, $raw; $($remaining)*);
     };
 }
@@ -110,16 +163,6 @@ impl YPos {
     #[inline]
     pub fn as_signed(self) -> SignedYPos {
         SignedYPos(self.0 as SignedYPosRaw)
-    }
-
-    #[inline]
-    pub fn trunc(self) -> YPosRaw {
-        self.0 >> FRACT_BITS
-    }
-
-    #[inline]
-    pub fn fract(self) -> YPosRaw {
-        self.0 & ((1 << FRACT_BITS) - 1)
     }
 
     #[inline]
@@ -140,6 +183,11 @@ impl YPos {
     #[inline]
     pub fn div_into_int(self, other: Self) -> YPosRaw {
         self.0 / other.0
+    }
+
+    #[inline]
+    pub fn div_ceil_into_int(self, other: Self) -> YPosRaw {
+        (self.0 + other.0 - 1) / other.0
     }
 }
 
@@ -180,26 +228,6 @@ impl SignedYPos {
     #[inline]
     pub fn as_unsigned(self) -> YPos {
         YPos(self.0 as YPosRaw)
-    }
-
-    #[inline]
-    pub fn trunc(self) -> SignedYPosRaw {
-        self.0 / (1 << FRACT_BITS)
-    }
-
-    #[inline]
-    pub fn fract(self) -> SignedYPosRaw {
-        self.0 % (1 << FRACT_BITS)
-    }
-
-    #[inline]
-    pub fn from_int(value: SignedYPosRaw) -> Self {
-        SignedYPos(value << FRACT_BITS)
-    }
-
-    #[inline]
-    pub fn div_int(self, other: Self) -> SignedYPosRaw {
-        self.0 / other.0
     }
 }
 
