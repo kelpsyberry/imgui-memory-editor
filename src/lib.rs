@@ -32,6 +32,7 @@ macro_rules! str_buf {
 }
 
 bitflags::bitflags! {
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     pub struct Flags: u16 {
         // Editor properties
         const READ_ONLY = 1 << 0;
